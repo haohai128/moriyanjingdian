@@ -1,14 +1,14 @@
 {
   "game": "末日眼镜店",
-  "version": "demo-0.2",
+  "version": "demo-0.3-mobile",
   "files": {
     "index.apple-touch-icon.png": "c4ea90c0c36c322ab0c7703c5738eaf60ea232ea136c889cf69f3ed7946b0787",
     "index.audio.position.worklet.js": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8",
     "index.audio.worklet.js": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3",
-    "index.html": "184688b4e28f1f887852fdc855af959273042126cdc7dc88b92cecaf4018c01e",
+    "index.html": "7b284cfe56bf1876b59b49bdcb59031c4e83a44b04831c2f1a551e677c7d0692",
     "index.icon.png": "3d9deaabb06a84770ac9910ea200f7b43d5cdc36c6dfd9c30c9d551352c13191",
     "index.js": "11aa82874d5a933f8d1e24b96c845617c66a3934e91304811783572df4b1ddc5",
-    "index.pck": "829069be4c81fd024008dca2c8d98d3b80929f33197ef42606447317afe428ea",
+    "index.pck": "7229813400af9c0a67dd3ab5820a75fb07800ebaa670cdc6d2359d1bbd8eea73",
     "index.png": "3cb4495c0b98dfbe4b663cbf2b6836473572339beb66d902367893162a70be0e",
     "index.wasm": "fc74679e3b97f76878947fcd4fbe1268cbfa6188182a2e33bbc3f5dc9bfa57d0",
     "licenses.html": "8a54fa6317ef87d991694d2bf6e38782bbfab951d6d0462ccfa63f8240962a87"
