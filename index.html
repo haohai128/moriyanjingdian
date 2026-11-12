@@ -23,6 +23,7 @@
     button:disabled { opacity: .65; cursor: wait; }
     #start { width: 100%; }
     #notice { white-space: pre-wrap; color: #e7c28b; font-size: 14px; }
+    #load-detail { min-height: 1.8em; margin-top: -8px; }
     .tools { position: fixed; right: 12px; bottom: 12px; z-index: 1; display: flex; gap: 6px; opacity: .65; }
     .tools:hover { opacity: 1; }
     .tools button, .tools a { font-size: 11px; padding: 5px 9px; background: #112630; color: #afc2b5; text-decoration: none; border: 1px solid #37534f; border-radius: 4px; }
@@ -42,7 +43,8 @@
       <h1>末日眼镜店</h1>
       <p>替看不清路的人，留一盏灯。<br>第一章 · 第一副备用镜</p>
       <progress id="progress" value="0" max="1"></progress>
-      <p id="notice">准备好后，点击下方按钮开始。</p>
+      <p id="notice" role="status">正在准备游戏…</p>
+      <p id="load-detail" class="note">首次打开需要下载游戏，再次打开通常更快。</p>
       <button id="start">开始试玩</button>
       <p class="note">电脑键盘与鼠标操作：A / D 移动，E 互动，Tab 背包。<br><span id="storage-note">允许网站存储时，进度保存在当前浏览器。</span><br>本版尚未提供手机触屏操作。</p>
     </main>
@@ -68,41 +70,99 @@
       config.persistentPaths = [];
       document.getElementById('storage-note').textContent = '当前隔离窗口仅保留本次进度，刷新后重新开始。';
     }
-    const engine = new Engine(config);
     const start = document.getElementById('start');
     const notice = document.getElementById('notice');
+    const detail = document.getElementById('load-detail');
     const progress = document.getElementById('progress');
     const canvas = document.getElementById('canvas');
     let launching = false;
+    let prepared = false;
+    let failed = false;
+    let preparation;
+    let elapsedTimer;
+    const preparationStarted = performance.now();
+    const stopTimer = () => clearInterval(elapsedTimer);
+    function showFailure(error) {
+      failed = true;
+      stopTimer();
+      console.error(error);
+      notice.textContent = '启动未完成：' + String(error.message || error);
+      detail.textContent = '请刷新页面重试；若持续失败，请尝试其他网络或浏览器。';
+      start.textContent = '刷新重试';
+      start.disabled = false;
+    }
+    config.onProgress = (current, total) => {
+      if (prepared || failed) return;
+      if (total > 0 && current >= total) {
+        // Download completion is not engine readiness. Compilation and startup
+        // still take time, especially on slower devices.
+        progress.removeAttribute('value');
+        notice.textContent = '下载已完成，正在准备游戏…';
+      } else if (total > 0) {
+        progress.max = total;
+        progress.value = current;
+        notice.textContent = '正在下载游戏 ' + Math.floor(current / total * 100) + '%';
+      } else {
+        progress.removeAttribute('value');
+      }
+    };
+    const engine = new Engine(config);
     const missing = Engine.getMissingFeatures({threads: false});
     if (location.protocol === 'file:') {
       notice.textContent = '请通过网站链接打开游戏，不能直接双击 HTML 文件。';
+      detail.textContent = '';
       start.disabled = true;
     } else if (missing.length) {
       notice.textContent = '当前浏览器缺少游戏所需功能：' + missing.join('、') + '\n请尝试新版 Chrome、Edge 或 Firefox，并启用图形加速。';
+      detail.textContent = '';
       start.disabled = true;
+    } else {
+      // Prepare while the visitor reads the intro. These same promises/files
+      // are consumed by start(), so clicking does not download them again.
+      const pack = config.mainPack || `${config.executable}.pck`;
+      elapsedTimer = setInterval(() => {
+        const seconds = Math.floor((performance.now() - preparationStarted) / 1000);
+        detail.textContent = `已等待 ${seconds} 秒。` + (seconds >= 15
+          ? '首次打开可能较慢，请保持页面打开；若长时间无进展，可尝试其他网络。'
+          : '首次打开需要下载游戏，再次打开通常更快。');
+      }, 1000);
+      preparation = Promise.all([
+        engine.init(config.executable),
+        engine.preloadFile(pack, pack),
+      ]).then(() => {
+        prepared = true;
+        if (!launching) {
+          stopTimer();
+          progress.max = 1;
+          progress.value = 1;
+          notice.textContent = '游戏已准备好，点击开始试玩。';
+          detail.textContent = '准备完成。';
+        }
+        return true;
+      }).catch(error => {
+        showFailure(error);
+        return false;
+      });
     }
     start.addEventListener('click', async () => {
+      if (failed) { location.reload(); return; }
       if (launching) return;
       launching = true;
       start.disabled = true;
-      start.textContent = '正在加载…';
-      notice.textContent = '首次加载需要下载游戏，请稍候。';
+      start.textContent = '正在准备…';
       try {
-        await engine.startGame({ canvas, onProgress(current, total) {
-          if (total > 0) {
-            progress.max = total; progress.value = current;
-            notice.textContent = '正在加载游戏 ' + Math.round(current / total * 100) + '%';
-          } else { progress.removeAttribute('value'); }
-        }});
+        if (!await preparation) return;
+        stopTimer();
+        notice.textContent = '正在进入游戏…';
+        detail.textContent = '资源准备完成，正在打开游戏画面。';
+        progress.removeAttribute('value');
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const pack = config.mainPack || `${config.executable}.pck`;
+        await engine.start({ canvas, args: ['--main-pack', pack].concat(config.args || []) });
         document.getElementById('loading').remove();
         canvas.focus();
       } catch (error) {
-        console.error(error);
-        notice.textContent = '启动未完成：' + String(error.message || error) + '\n请刷新页面重试；若持续失败，请更换浏览器。';
-        start.textContent = '刷新重试';
-        start.disabled = false;
-        start.onclick = () => location.reload();
+        showFailure(error);
       }
     });
     document.getElementById('fullscreen').addEventListener('click', async () => {
