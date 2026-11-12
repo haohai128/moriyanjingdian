@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#112630">
+  <title>末日眼镜店 · 第一副备用镜</title>
+  <link id="-gd-engine-icon" rel="icon" type="image/png" href="index.icon.png" />
+<link rel="apple-touch-icon" href="index.apple-touch-icon.png"/>
+
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #0c1922; color: #e0e6d9; font-family: "Microsoft YaHei", system-ui, sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; outline: none; touch-action: none; }
+    #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #0c1922; z-index: 2; padding: 24px; }
+    .card { width: min(560px, 100%); padding: 40px; border: 1px solid #71866c; border-radius: 12px; background: #152e36; }
+    .eyebrow { color: #e7c28b; font-size: 12px; letter-spacing: .15em; }
+    h1 { font-weight: 500; font-size: clamp(32px, 5vw, 46px); margin: 16px 0; }
+    p { color: #afc2b5; line-height: 1.8; }
+    progress { width: 100%; height: 7px; margin: 18px 0; accent-color: #e7c28b; }
+    button { cursor: pointer; color: #e7c28b; border: 1px solid #778b72; background: #263f42; padding: 12px 20px; border-radius: 6px; font: inherit; }
+    button:hover { background: #3c534b; }
+    button:disabled { opacity: .65; cursor: wait; }
+    #start { width: 100%; }
+    #notice { white-space: pre-wrap; color: #e7c28b; font-size: 14px; }
+    .tools { position: fixed; right: 12px; bottom: 12px; z-index: 1; display: flex; gap: 6px; opacity: .65; }
+    .tools:hover { opacity: 1; }
+    .tools button, .tools a { font-size: 11px; padding: 5px 9px; background: #112630; color: #afc2b5; text-decoration: none; border: 1px solid #37534f; border-radius: 4px; }
+    .note { font-size: 12px; }
+    #webgl-error { display: none; }
+    dialog { width: min(800px, 92vw); max-height: 85vh; color: #e0e6d9; background: #152e36; border: 1px solid #778b72; border-radius: 10px; padding: 24px; }
+    dialog::backdrop { background: #061017dd; }
+    dialog pre { white-space: pre-wrap; overflow-wrap: anywhere; font: 12px/1.7 monospace; }
+    dialog .close-row { position: sticky; top: -24px; background: #152e36; padding: 12px 0; }
+  </style>
+</head>
+<body>
+  <canvas id="canvas" tabindex="0" aria-label="末日眼镜店游戏画面">浏览器需要支持 Canvas。</canvas>
+  <div id="loading">
+    <main class="card">
+      <div class="eyebrow">LAST LIGHT OPTICS · 浏览器试玩版</div>
+      <h1>末日眼镜店</h1>
+      <p>替看不清路的人，留一盏灯。<br>第一章 · 第一副备用镜</p>
+      <progress id="progress" value="0" max="1"></progress>
+      <p id="notice">准备好后，点击下方按钮开始。</p>
+      <button id="start">开始试玩</button>
+      <p class="note">电脑键盘与鼠标操作：A / D 移动，E 互动，Tab 背包。<br><span id="storage-note">允许网站存储时，进度保存在当前浏览器。</span><br>本版尚未提供手机触屏操作。</p>
+    </main>
+  </div>
+  <nav class="tools" aria-label="网页操作">
+    <button id="fullscreen" type="button">全屏</button>
+    <button id="licenses" type="button">开源许可</button>
+  </nav>
+  <dialog id="license-dialog" aria-label="开源许可">
+    <div class="close-row"><button id="close-licenses" type="button">关闭许可，返回游戏</button></div>
+    <pre id="license-text">正在读取包内许可文件…</pre>
+  </dialog>
+  <noscript>请启用 JavaScript 后运行游戏。</noscript>
+  <script src="index.js"></script>
+  <script>
+    const config = {"args":[],"canvasResizePolicy":2,"emscriptenPoolSize":8,"ensureCrossOriginIsolationHeaders":true,"executable":"index","experimentalVK":false,"fileSizes":{"index.pck":285364,"index.wasm":39514754},"focusCanvas":true,"gdextensionLibs":[],"godotPoolSize":4};
+    // Opaque-origin sandboxes can forbid IndexedDB. Keep the game playable
+    // using session memory without asking for storage or parent-window access.
+    let persistentStorage = true;
+    try { persistentStorage = globalThis.origin !== 'null' && !!globalThis.indexedDB; }
+    catch { persistentStorage = false; }
+    if (!persistentStorage) {
+      config.persistentPaths = [];
+      document.getElementById('storage-note').textContent = '当前隔离窗口仅保留本次进度，刷新后重新开始。';
+    }
+    const engine = new Engine(config);
+    const start = document.getElementById('start');
+    const notice = document.getElementById('notice');
+    const progress = document.getElementById('progress');
+    const canvas = document.getElementById('canvas');
+    let launching = false;
+    const missing = Engine.getMissingFeatures({threads: false});
+    if (location.protocol === 'file:') {
+      notice.textContent = '请通过网站链接打开游戏，不能直接双击 HTML 文件。';
+      start.disabled = true;
+    } else if (missing.length) {
+      notice.textContent = '当前浏览器缺少游戏所需功能：' + missing.join('、') + '\n请尝试新版 Chrome、Edge 或 Firefox，并启用图形加速。';
+      start.disabled = true;
+    }
+    start.addEventListener('click', async () => {
+      if (launching) return;
+      launching = true;
+      start.disabled = true;
+      start.textContent = '正在加载…';
+      notice.textContent = '首次加载需要下载游戏，请稍候。';
+      try {
+        await engine.startGame({ canvas, onProgress(current, total) {
+          if (total > 0) {
+            progress.max = total; progress.value = current;
+            notice.textContent = '正在加载游戏 ' + Math.round(current / total * 100) + '%';
+          } else { progress.removeAttribute('value'); }
+        }});
+        document.getElementById('loading').remove();
+        canvas.focus();
+      } catch (error) {
+        console.error(error);
+        notice.textContent = '启动未完成：' + String(error.message || error) + '\n请刷新页面重试；若持续失败，请更换浏览器。';
+        start.textContent = '刷新重试';
+        start.disabled = false;
+        start.onclick = () => location.reload();
+      }
+    });
+    document.getElementById('fullscreen').addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await document.documentElement.requestFullscreen();
+        canvas.focus();
+      } catch (error) { console.warn(error); }
+    });
+    const licenseDialog = document.getElementById('license-dialog');
+    document.getElementById('licenses').addEventListener('click', async () => {
+      licenseDialog.showModal();
+      try {
+        const response = await fetch('licenses.html');
+        if (!response.ok) throw new Error('HTTP ' + response.status);
+        const documentText = new DOMParser().parseFromString(await response.text(), 'text/html');
+        document.getElementById('license-text').textContent = documentText.querySelector('pre').textContent;
+      } catch {
+        document.getElementById('license-text').textContent = '许可文件未能读取，请联系发布者检查包内 licenses.html。';
+      }
+    });
+    document.getElementById('close-licenses').addEventListener('click', () => { licenseDialog.close(); canvas.focus(); });
+    // Tab belongs to the inventory while the canvas is focused.
+    canvas.addEventListener('keydown', event => { if (event.key === 'Tab') event.preventDefault(); });
+  </script>
+</body>
+</html>
+
