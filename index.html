@@ -99,6 +99,10 @@
     let failed = false;
     let preparation;
     let elapsedTimer;
+    let startup;
+    const legacyLoader = new URLSearchParams(location.search).get('loader') === 'legacy';
+    // Local Performance entries only: no telemetry uploads or player data.
+    performance.mark('llo:prepare-start');
     const preparationStarted = performance.now();
     const stopTimer = () => clearInterval(elapsedTimer);
     function showFailure(error) {
@@ -126,6 +130,19 @@
       }
     };
     const engine = new Engine(config);
+    function startRuntime() {
+      if (!startup) {
+        performance.mark('llo:start-call');
+        startup = engine.start({canvas, args: ['--main-pack', packPath].concat(config.args || [])}).then(async () => {
+          performance.mark('llo:start-return');
+          performance.measure('llo:engine-start', 'llo:start-call', 'llo:start-return');
+          // Let the title draw before calling the introduction ready. Gameplay
+          // still waits for the existing "开始第一夜" / continue action.
+          if (!launching) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        });
+      }
+      return startup;
+    }
     const missing = Engine.getMissingFeatures({threads: false});
     if (location.protocol === 'file:') {
       notice.textContent = '请通过网站链接打开游戏，不能直接双击 HTML 文件。';
@@ -145,9 +162,17 @@
           : '首次打开需要下载游戏，再次打开通常更快。');
       }, 1000);
       preparation = Promise.all([
-        engine.init(config.executable),
-        engine.preloadFile(packUrl, packPath),
-      ]).then(() => {
+        engine.init(config.executable).then(() => performance.mark('llo:engine-init-done')),
+        engine.preloadFile(packUrl, packPath).then(() => performance.mark('llo:pack-ready')),
+      ]).then(async () => {
+        performance.mark('llo:assets-ready');
+        if (!legacyLoader) {
+          notice.textContent = '下载已完成，正在打开游戏画面…';
+          progress.removeAttribute('value');
+          await startRuntime();
+        }
+        performance.mark('llo:ready');
+        performance.measure('llo:prepare', 'llo:prepare-start', 'llo:ready');
         prepared = true;
         if (!launching) {
           stopTimer();
@@ -168,16 +193,19 @@
       launching = true;
       start.disabled = true;
       start.textContent = '正在准备…';
+      performance.mark('llo:click');
       try {
         if (!await preparation) return;
         stopTimer();
         notice.textContent = '正在进入游戏…';
         detail.textContent = '资源准备完成，正在打开游戏画面。';
         progress.removeAttribute('value');
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        await engine.start({ canvas, args: ['--main-pack', packPath].concat(config.args || []) });
+        if (legacyLoader) await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        await startRuntime();
         document.body.classList.add('playing');
         document.getElementById('loading').remove();
+        performance.mark('llo:entered');
+        performance.measure('llo:click-to-enter', 'llo:click', 'llo:entered');
         canvas.focus();
       } catch (error) {
         showFailure(error);

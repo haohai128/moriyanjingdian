@@ -1,11 +1,11 @@
 {
   "game": "末日眼镜店",
-  "version": "demo-0.3-mobile",
+  "version": "demo-0.3-mobile-startup",
   "files": {
     "index.apple-touch-icon.png": "c4ea90c0c36c322ab0c7703c5738eaf60ea232ea136c889cf69f3ed7946b0787",
     "index.audio.position.worklet.js": "be33985bc7160d6bf9646f259cd86b259cd67b02ccb297ee5c44f8ac84327bc8",
     "index.audio.worklet.js": "5b476a9c9ce642c0ee4256436d1bc31d9c38f868aca0f9a8e2a57c18d2dec2a3",
-    "index.html": "7b284cfe56bf1876b59b49bdcb59031c4e83a44b04831c2f1a551e677c7d0692",
+    "index.html": "b534e7d1c2820f577699076329eb7fdc276759b4cd92397d468330883a748655",
     "index.icon.png": "3d9deaabb06a84770ac9910ea200f7b43d5cdc36c6dfd9c30c9d551352c13191",
     "index.js": "11aa82874d5a933f8d1e24b96c845617c66a3934e91304811783572df4b1ddc5",
     "index.pck": "7229813400af9c0a67dd3ab5820a75fb07800ebaa670cdc6d2359d1bbd8eea73",
